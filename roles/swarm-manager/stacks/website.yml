@@ -1,0 +1,98 @@
+---
+- name: Make sure stack directory is present
+  file:
+    path: /srv/website
+    state: directory
+
+- name: Make sure stoage directory is present
+  file:
+    path: /srv/website/storage
+    state: directory
+
+- name: Deploy environment files
+  template:
+    src: env/{{ item }}
+    dest: /srv/website/{{ item }}
+  loop:
+    - website.env
+
+- name: Deploy the website stack
+  community.docker.docker_stack:
+    name: website
+    resolve_image: never
+    with_registry_auth: true
+    compose:
+      - version: "3.6"
+        x-deploy-options: &deploy
+          update_config:
+            parallelism: 2
+            delay: 3s
+            failure_action: rollback
+            order: start-first
+
+        x-defaults: &defaults
+          env_file:
+            - /srv/website/website.env
+          networks:
+            - stacknet
+          deploy:
+            <<: *deploy
+
+        services:
+          backend:
+            <<: *defaults
+            image: ghost:4.41.3-alpine
+            volumes:
+              - /srv/website/storage:/var/lib/ghost/content
+            deploy:
+              placement:
+                constraints:
+                  - node.hostname == {{ hostvars[groups['managers'][0]]['swarm_manager_hostname'] }}
+
+          backup:
+            image: ghcr.io/f213/docker-s3-cron-backup
+            environment:
+              BACKUP_NAME: website
+              CRON_SCHEDULE: 32 17 * * *
+              S3_ENDPOINT: "{{ backup_s3_endpoint }}"
+              AWS_ACCESS_KEY_ID: "{{ backup_s3_access_key_id }}"
+              AWS_SECRET_ACCESS_KEY: "{{ backup_s3_secret_access_key }}"
+              S3_BUCKET_URL: "s3://{{ backup_s3_bucket }}"
+              HEALTHCHECKS_IO_CHECK_ID: "{{ backup_healthchecks_io_id }}"
+            volumes:
+              - /srv/website/storage:/data:ro
+            deploy:
+              placement:
+                constraints:
+                  - node.hostname == {{ hostvars[groups['managers'][0]]['swarm_manager_hostname'] }}
+
+
+          frontend:
+            <<: *defaults
+            image: ghcr.io/f213/website
+            env_file:
+              - /srv/website/website.env
+            environment:
+              - BACKEND_URL=http://website_backend:2368
+            networks:
+              - stacknet
+              - traefiknet
+            deploy:
+              <<: *deploy
+              labels:
+                - "traefik.enable=true"
+                - "traefik.port=3000"
+                - "traefik.frontend.rule=Host:{{ url }}"
+                - "traefik.docker.network=traefiknet"
+
+        secrets:
+          legacy_database_ssh_tunnel_private_key:
+            external: true
+
+        networks:
+          stacknet:
+            driver: overlay
+
+          traefiknet:
+            external: true
+

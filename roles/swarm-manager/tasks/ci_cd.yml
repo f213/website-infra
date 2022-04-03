@@ -1,0 +1,8 @@
+---
+- name: Make sure CI user is able to access docker registry
+  become: yes
+  become_user: circle
+  docker_login:
+    registry_url: ghcr.io
+    username: "{{ ghcr_login }}"
+    password: "{{ ghcr_token }}"

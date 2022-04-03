@@ -1,0 +1,7 @@
+---
+- include_tasks: docker_swarm.yml
+- include_tasks: ci_cd.yml
+- include_tasks: postgres_client.yml
+
+- include_tasks: ../stacks/site.yml
+- include_tasks: ../stacks/website.yml
