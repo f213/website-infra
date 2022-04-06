@@ -50,7 +50,7 @@
                   - node.hostname == {{ hostvars[groups['managers'][0]]['swarm_manager_hostname'] }}
 
           backup:
-            image: ghcr.io/f213/docker-s3-cron-backup
+            image: peterrus/s3-cron-backup:v1.4.1
             environment:
               BACKUP_NAME: website
               CRON_SCHEDULE: 32 17 * * *
@@ -58,7 +58,7 @@
               AWS_ACCESS_KEY_ID: "{{ backup_s3_access_key_id }}"
               AWS_SECRET_ACCESS_KEY: "{{ backup_s3_secret_access_key }}"
               S3_BUCKET_URL: "s3://{{ backup_s3_bucket }}"
-              HEALTHCHECKS_IO_CHECK_ID: "{{ backup_healthchecks_io_id }}"
+              WEBHOOK_URL: "https://hc-ping.com/{{ backup_healthchecks_io_id }}"
             volumes:
               - /srv/website/storage:/data:ro
             deploy:
