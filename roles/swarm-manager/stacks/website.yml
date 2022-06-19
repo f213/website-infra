@@ -41,7 +41,7 @@
         services:
           backend:
             <<: *defaults
-            image: ghost:4.41.3-alpine
+            image: ghost:5.2.3-alpine
             volumes:
               - /srv/website/storage:/var/lib/ghost/content
             deploy:
